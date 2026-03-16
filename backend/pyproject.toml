@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "contract-intelligence-ai"
+version = "0.1.0"
+description = "AI-powered contract analysis platform using Microsoft Agent Framework"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "agent-framework",
+    "azure-cosmos>=4.7.0",
+    "azure-ai-documentintelligence>=1.0.0",
+    "azure-storage-blob>=12.20.0",
+    "azure-identity>=1.17.0",
+    "python-dotenv>=1.0.0",
+    "pydantic-settings>=2.4.0",
+    "python-multipart>=0.0.9",
+    "pandas>=2.2.0",
+    "aiofiles>=24.1.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
