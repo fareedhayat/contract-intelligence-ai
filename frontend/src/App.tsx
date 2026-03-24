@@ -5,9 +5,11 @@ import Upload from "./pages/Upload";
 import ContractDetail from "./pages/ContractDetail";
 import Compare from "./pages/Compare";
 import Obligations from "./pages/Obligations";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 function App() {
   return (
+    <ErrorBoundary>
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -18,6 +20,7 @@ function App() {
         <Route path="/obligations" element={<Obligations />} />
       </Route>
     </Routes>
+    </ErrorBoundary>
   );
 }
 
