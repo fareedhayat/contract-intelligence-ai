@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime
 
-from agent_framework.azure import AzureOpenAIResponsesClient
-from agent_framework.orchestrations import SequentialBuilder
+from agent_framework import Agent
+from agent_framework.openai import OpenAIChatCompletionClient
 from azure.identity import AzureCliCredential
 
 from app.core.config import Settings
@@ -64,10 +64,12 @@ class ComparisonResponse(BaseModel):
 
 # --- Client factory ---
 
-def create_client(settings: Settings) -> AzureOpenAIResponsesClient:
-    return AzureOpenAIResponsesClient(
-        project_endpoint=settings.azure_openai_endpoint,
-        deployment_name=settings.azure_openai_deployment,
+def create_client(settings: Settings) -> OpenAIChatCompletionClient:
+    """Create an Azure OpenAI chat client using the stable Agent Framework API."""
+    return OpenAIChatCompletionClient(
+        model=settings.azure_openai_deployment,
+        azure_endpoint=settings.azure_openai_endpoint,
+        api_version=settings.azure_openai_api_version,
         credential=AzureCliCredential(),
     )
 
@@ -86,37 +88,38 @@ async def run_analysis_pipeline(
     """
     client = create_client(settings)
 
-    extractor = client.as_agent(
+    # Create agents using the stable Agent class
+    extractor = Agent(
+        client=client,
         name="DataExtractor",
-        instructions=EXTRACTOR_PROMPT,
+        instructions=EXTRACTOR_PROMPT + "\n\nRespond with valid JSON matching this schema: " + ExtractorResponse.model_json_schema().__str__(),
         tools=[parse_contract_dates],
-        response_format=ExtractorResponse,
     )
 
-    risk_analyst = client.as_agent(
+    risk_analyst = Agent(
+        client=client,
         name="RiskAnalyst",
-        instructions=RISK_PROMPT,
+        instructions=RISK_PROMPT + "\n\nRespond with valid JSON matching this schema: " + RiskResponse.model_json_schema().__str__(),
         tools=[check_risk_rules],
-        response_format=RiskResponse,
     )
 
-    obligation_tracker = client.as_agent(
+    obligation_tracker = Agent(
+        client=client,
         name="ObligationTracker",
-        instructions=OBLIGATION_PROMPT,
+        instructions=OBLIGATION_PROMPT + "\n\nRespond with valid JSON matching this schema: " + ObligationResponse.model_json_schema().__str__(),
         tools=[parse_contract_dates],
-        response_format=ObligationResponse,
     )
 
-    summarizer = client.as_agent(
+    summarizer = Agent(
+        client=client,
         name="Summarizer",
-        instructions=SUMMARY_PROMPT,
-        response_format=SummaryResponse,
+        instructions=SUMMARY_PROMPT + "\n\nRespond with valid JSON matching this schema: " + SummaryResponse.model_json_schema().__str__(),
     )
 
     # Run each agent individually so we can collect structured output from each
     extractor_result = await extractor.run(contract_text)
     extracted_data = ExtractorResponse.model_validate_json(
-        extractor_result.text
+        str(extractor_result)
     ).extracted_data
 
     # Feed contract text + extraction results to risk analyst
@@ -125,7 +128,7 @@ async def run_analysis_pipeline(
         f"{extracted_data.model_dump_json()}"
     )
     risk_result = await risk_analyst.run(risk_input)
-    risk_flags = RiskResponse.model_validate_json(risk_result.text).risk_flags
+    risk_flags = RiskResponse.model_validate_json(str(risk_result)).risk_flags
 
     # Feed contract text + prior results to obligation tracker
     obligation_input = (
@@ -134,7 +137,7 @@ async def run_analysis_pipeline(
     )
     obligation_result = await obligation_tracker.run(obligation_input)
     obligations = ObligationResponse.model_validate_json(
-        obligation_result.text
+        str(obligation_result)
     ).obligations
 
     # Feed contract text + all prior results to summarizer
@@ -145,7 +148,7 @@ async def run_analysis_pipeline(
         f"Obligations:\n{ObligationResponse(obligations=obligations).model_dump_json()}"
     )
     summary_result = await summarizer.run(summary_input)
-    summary = SummaryResponse.model_validate_json(summary_result.text).summary
+    summary = SummaryResponse.model_validate_json(str(summary_result)).summary
 
     return AnalysisResult(
         id=uuid.uuid4().hex,
@@ -170,10 +173,10 @@ async def run_comparison(
     """Compare two contract analyses side by side."""
     client = create_client(settings)
 
-    comparator = client.as_agent(
+    comparator = Agent(
+        client=client,
         name="Comparator",
-        instructions=COMPARISON_PROMPT,
-        response_format=ComparisonResponse,
+        instructions=COMPARISON_PROMPT + "\n\nRespond with valid JSON matching this schema: " + ComparisonResponse.model_json_schema().__str__(),
     )
 
     comparison_input = (
@@ -184,7 +187,7 @@ async def run_comparison(
     )
 
     result = await comparator.run(comparison_input)
-    parsed = ComparisonResponse.model_validate_json(result.text)
+    parsed = ComparisonResponse.model_validate_json(str(result))
 
     return ComparisonResult(
         id=uuid.uuid4().hex,

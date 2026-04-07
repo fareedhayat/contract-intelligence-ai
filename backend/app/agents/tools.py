@@ -7,7 +7,7 @@ from app.core.config import Settings
 from app.services.cuad_loader import get_ground_truth
 
 
-@tool
+@tool(name="lookup_cuad_ground_truth", description="Look up CUAD expert annotations for a specific contract and clause type")
 def lookup_cuad_ground_truth(
     filename: Annotated[str, Field(description="CUAD contract filename (e.g., 'ContractName.txt')")],
     clause_type: Annotated[str, Field(description="Clause category name from CUAD's 41 categories")],
@@ -26,7 +26,7 @@ def lookup_cuad_ground_truth(
     return "; ".join(annotations)
 
 
-@tool
+@tool(name="check_risk_rules", description="Check a clause against known risk rules and thresholds")
 def check_risk_rules(
     clause_text: Annotated[str, Field(description="The contract clause text to evaluate")],
     clause_type: Annotated[str, Field(description="Type of clause (e.g., 'liability', 'termination', 'indemnification')")],
@@ -50,7 +50,6 @@ def check_risk_rules(
         if "without cause" in clause_lower:
             risks.append("MEDIUM: Termination without cause permitted.")
         if any(phrase in clause_lower for phrase in ["cure period", "notice"]):
-            # Check for very short cure periods
             for days in ["5 days", "7 days", "5 business days"]:
                 if days in clause_lower:
                     risks.append(f"MEDIUM: Short cure period ({days}).")
@@ -83,7 +82,7 @@ def check_risk_rules(
     return "\n".join(risks)
 
 
-@tool
+@tool(name="parse_contract_dates", description="Extract and normalize dates found in contract text")
 def parse_contract_dates(
     text: Annotated[str, Field(description="Text containing dates to extract and normalize")],
 ) -> str:
@@ -102,7 +101,6 @@ def parse_contract_dates(
     for pattern, label in date_patterns:
         matches = re.finditer(pattern, text, re.IGNORECASE)
         for match in matches:
-            # Get surrounding context (up to 50 chars before and after)
             start = max(0, match.start() - 50)
             end = min(len(text), match.end() + 50)
             context = text[start:end].replace("\n", " ").strip()
