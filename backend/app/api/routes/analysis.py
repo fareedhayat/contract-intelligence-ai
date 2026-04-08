@@ -1,4 +1,6 @@
 import uuid
+import logging
+import traceback
 from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
@@ -15,6 +17,7 @@ from app.services.database import (
 )
 from app.agents.pipeline import run_analysis_pipeline
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -25,24 +28,33 @@ def _get_settings() -> Settings:
 async def _run_analysis_background(contract_id: str, settings: Settings):
     """Background task that runs the full analysis pipeline."""
     try:
+        logger.info(f"Starting analysis for contract {contract_id}")
         await update_analysis_status(contract_id, AnalysisStatus.IN_PROGRESS, settings)
 
         contract = await get_contract(contract_id, settings)
         if contract is None:
+            logger.error(f"Contract {contract_id} not found")
             await update_analysis_status(
                 contract_id, AnalysisStatus.FAILED, settings,
                 error_message="Contract not found",
             )
             return
 
+        logger.info(f"Parsing document: {contract.file_path}")
         contract_text = await parse_document(contract.file_path, settings)
+        logger.info(f"Document parsed, {len(contract_text)} characters. Running AI pipeline...")
+        
         result = await run_analysis_pipeline(contract_text, contract_id, settings)
+        logger.info(f"Analysis complete for {contract_id}: {len(result.risk_flags)} risks, {len(result.obligations)} obligations")
         await save_analysis(result, settings)
 
     except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        logger.error(f"Analysis failed for {contract_id}: {error_msg}")
+        logger.error(traceback.format_exc())
         await update_analysis_status(
             contract_id, AnalysisStatus.FAILED, settings,
-            error_message=str(e),
+            error_message=error_msg,
         )
 
 

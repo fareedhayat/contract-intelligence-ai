@@ -3,7 +3,6 @@ from datetime import datetime
 
 from agent_framework import Agent
 from agent_framework.openai import OpenAIChatCompletionClient
-from azure.identity import AzureCliCredential
 
 from app.core.config import Settings
 from app.core.models import (
@@ -65,12 +64,12 @@ class ComparisonResponse(BaseModel):
 # --- Client factory ---
 
 def create_client(settings: Settings) -> OpenAIChatCompletionClient:
-    """Create an Azure OpenAI chat client using the stable Agent Framework API."""
+    """Create an Azure OpenAI chat client using API key authentication."""
     return OpenAIChatCompletionClient(
         model=settings.azure_openai_deployment,
         azure_endpoint=settings.azure_openai_endpoint,
         api_version=settings.azure_openai_api_version,
-        credential=AzureCliCredential(),
+        api_key=settings.azure_openai_api_key,
     )
 
 

@@ -1,13 +1,40 @@
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import contracts, analysis, compare, obligations, cuad
 from app.api.error_handlers import add_error_handlers
+from app.core.config import Settings
+from app.services.database import ensure_database
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup and shutdown events."""
+    # Startup: ensure Cosmos DB database and containers exist
+    settings = Settings()
+    try:
+        await ensure_database(settings)
+        print("✓ Cosmos DB database and containers ready")
+    except Exception as e:
+        print(f"⚠ Cosmos DB initialization failed: {e}")
+    yield
+    # Shutdown: cleanup if needed
+
 
 app = FastAPI(
     title="Contract Intelligence AI",
     description="AI-powered contract analysis platform using CUAD dataset and Microsoft Agent Framework",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

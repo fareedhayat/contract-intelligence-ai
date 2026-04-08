@@ -82,7 +82,6 @@ async def list_contracts(settings: Settings, skip: int = 0, limit: int = 20) -> 
 
     count_query = container.query_items(
         query="SELECT VALUE COUNT(1) FROM c",
-        enable_cross_partition_query=True,
     )
     total = 0
     async for item in count_query:
@@ -91,7 +90,6 @@ async def list_contracts(settings: Settings, skip: int = 0, limit: int = 20) -> 
     query = container.query_items(
         query="SELECT * FROM c ORDER BY c.upload_date DESC OFFSET @skip LIMIT @limit",
         parameters=[{"name": "@skip", "value": skip}, {"name": "@limit", "value": limit}],
-        enable_cross_partition_query=True,
     )
     contracts = []
     async for item in query:
@@ -113,7 +111,6 @@ async def delete_contract(contract_id: str, settings: Settings):
     query = analysis_container.query_items(
         query="SELECT * FROM c WHERE c.contract_id = @cid",
         parameters=[{"name": "@cid", "value": contract_id}],
-        enable_cross_partition_query=True,
     )
     async for item in query:
         await analysis_container.delete_item(item=item["id"], partition_key=item["contract_id"])
@@ -133,7 +130,6 @@ async def get_analysis(contract_id: str, settings: Settings) -> AnalysisResult |
     query = container.query_items(
         query="SELECT * FROM c WHERE c.contract_id = @cid ORDER BY c.created_at DESC",
         parameters=[{"name": "@cid", "value": contract_id}],
-        enable_cross_partition_query=True,
     )
     async for item in query:
         return AnalysisResult(**item)
@@ -183,7 +179,6 @@ async def get_dashboard_stats(settings: Settings) -> dict:
     # Total contracts
     total_query = container.query_items(
         query="SELECT VALUE COUNT(1) FROM c",
-        enable_cross_partition_query=True,
     )
     total_contracts = 0
     async for item in total_query:
@@ -192,7 +187,6 @@ async def get_dashboard_stats(settings: Settings) -> dict:
     # Analysis counts by status
     status_query = analysis_container.query_items(
         query="SELECT c.status, COUNT(1) as count FROM c GROUP BY c.status",
-        enable_cross_partition_query=True,
     )
     status_counts = {}
     async for item in status_query:
@@ -201,7 +195,6 @@ async def get_dashboard_stats(settings: Settings) -> dict:
     # High risk count
     risk_query = analysis_container.query_items(
         query="SELECT VALUE COUNT(1) FROM c WHERE ARRAY_LENGTH(c.risk_flags) > 0",
-        enable_cross_partition_query=True,
     )
     contracts_with_risks = 0
     async for item in risk_query:
