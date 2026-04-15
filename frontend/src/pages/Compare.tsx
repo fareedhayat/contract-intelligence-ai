@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Title2,
   Title3,
@@ -14,8 +14,9 @@ import {
   MessageBar,
   MessageBarBody,
 } from "@fluentui/react-components";
-import { listContracts, compareContracts } from "../services/api";
-import type { ContractDocument, ComparisonResult } from "../types";
+import { compareContracts } from "../services/api";
+import { useData } from "../components/DataProvider";
+import type { ComparisonResult } from "../types";
 
 const useStyles = makeStyles({
   selector: {
@@ -53,27 +54,13 @@ const useStyles = makeStyles({
 
 function Compare() {
   const styles = useStyles();
-  const [contracts, setContracts] = useState<ContractDocument[]>([]);
+  const { contracts, loading: loadingContracts } = useData();
+  const analyzedContracts = contracts.filter((c) => c.status === "completed");
   const [contractA, setContractA] = useState<string>("");
   const [contractB, setContractB] = useState<string>("");
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [loadingContracts, setLoadingContracts] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const data = await listContracts(0, 200);
-        setContracts(data.contracts.filter((c) => c.status === "completed"));
-      } catch {
-        // API not available
-      } finally {
-        setLoadingContracts(false);
-      }
-    }
-    load();
-  }, []);
 
   const handleCompare = async () => {
     if (!contractA || !contractB) return;
@@ -104,7 +91,7 @@ function Compare() {
 
       {loadingContracts ? (
         <Spinner label="Loading contracts..." />
-      ) : contracts.length < 2 ? (
+      ) : analyzedContracts.length < 2 ? (
         <MessageBar intent="warning" style={{ marginTop: 16 }}>
           <MessageBarBody>
             You need at least two analyzed contracts to compare. Upload and analyze contracts first.
@@ -117,10 +104,10 @@ function Compare() {
               <Text size={200} weight="semibold">Contract A</Text>
               <Dropdown
                 placeholder="Select contract..."
-                value={contracts.find((c) => c.id === contractA)?.filename || ""}
+                value={analyzedContracts.find((c) => c.id === contractA)?.filename || ""}
                 onOptionSelect={(_, data) => setContractA(data.optionValue as string)}
               >
-                {contracts
+                {analyzedContracts
                   .filter((c) => c.id !== contractB)
                   .map((c) => (
                     <Option key={c.id} value={c.id}>{c.filename}</Option>
@@ -131,10 +118,10 @@ function Compare() {
               <Text size={200} weight="semibold">Contract B</Text>
               <Dropdown
                 placeholder="Select contract..."
-                value={contracts.find((c) => c.id === contractB)?.filename || ""}
+                value={analyzedContracts.find((c) => c.id === contractB)?.filename || ""}
                 onOptionSelect={(_, data) => setContractB(data.optionValue as string)}
               >
-                {contracts
+                {analyzedContracts
                   .filter((c) => c.id !== contractA)
                   .map((c) => (
                     <Option key={c.id} value={c.id}>{c.filename}</Option>

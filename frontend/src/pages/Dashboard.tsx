@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Title2,
+  Title3,
   Text,
   Card,
-  CardHeader,
   makeStyles,
   tokens,
   Badge,
@@ -17,14 +16,16 @@ import {
   ClockRegular,
   ErrorCircleRegular,
   WarningRegular,
+  ShieldErrorRegular,
+  ShieldCheckmarkRegular,
+  CalendarCheckmarkRegular,
 } from "@fluentui/react-icons";
-import { getDashboardStats, listContracts } from "../services/api";
-import type { DashboardStats, ContractDocument } from "../types";
+import { useData } from "../components/DataProvider";
 
 const useStyles = makeStyles({
   statsGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
     gap: "16px",
     marginTop: "20px",
     marginBottom: "32px",
@@ -40,6 +41,40 @@ const useStyles = makeStyles({
   },
   statLabel: {
     color: tokens.colorNeutralForeground3,
+  },
+  riskSection: {
+    marginTop: "32px",
+    marginBottom: "32px",
+  },
+  riskGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+    gap: "12px",
+    marginTop: "12px",
+  },
+  riskCard: {
+    padding: "16px",
+    textAlign: "center",
+  },
+  riskValue: {
+    fontSize: "28px",
+    fontWeight: "bold",
+    display: "block",
+  },
+  highRisk: {
+    borderLeft: `4px solid ${tokens.colorPaletteRedBorder2}`,
+  },
+  mediumRisk: {
+    borderLeft: `4px solid ${tokens.colorPaletteYellowBorder2}`,
+  },
+  lowRisk: {
+    borderLeft: `4px solid ${tokens.colorPaletteGreenBorder2}`,
+  },
+  commonRisk: {
+    marginTop: "16px",
+    padding: "16px",
+    backgroundColor: tokens.colorNeutralBackground2,
+    borderRadius: tokens.borderRadiusMedium,
   },
   contractList: {
     display: "flex",
@@ -69,27 +104,7 @@ const useStyles = makeStyles({
 function Dashboard() {
   const styles = useStyles();
   const navigate = useNavigate();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [contracts, setContracts] = useState<ContractDocument[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const [statsData, contractsData] = await Promise.all([
-          getDashboardStats(),
-          listContracts(0, 10),
-        ]);
-        setStats(statsData);
-        setContracts(contractsData.contracts);
-      } catch {
-        // API not available yet
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, []);
+  const { stats, contracts, loading } = useData();
 
   if (loading) return <Spinner label="Loading dashboard..." />;
 
@@ -97,6 +112,7 @@ function Dashboard() {
     <div>
       <Title2>Dashboard</Title2>
 
+      {/* Main Stats */}
       <div className={styles.statsGrid}>
         <Card className={styles.statCard}>
           <DocumentSearchRegular fontSize={24} />
@@ -114,9 +130,9 @@ function Dashboard() {
           <Text className={styles.statValue}>{stats?.pending ?? 0}</Text>
         </Card>
         <Card className={styles.statCard}>
-          <WarningRegular fontSize={24} />
-          <Text className={styles.statLabel}>With Risks</Text>
-          <Text className={styles.statValue}>{stats?.contracts_with_risks ?? 0}</Text>
+          <CalendarCheckmarkRegular fontSize={24} />
+          <Text className={styles.statLabel}>Obligations</Text>
+          <Text className={styles.statValue}>{stats?.total_obligations ?? 0}</Text>
         </Card>
         <Card className={styles.statCard}>
           <ErrorCircleRegular fontSize={24} />
@@ -125,7 +141,57 @@ function Dashboard() {
         </Card>
       </div>
 
-      <Title2>Recent Contracts</Title2>
+      {/* Risk Breakdown */}
+      <div className={styles.riskSection}>
+        <Title3>
+          <ShieldErrorRegular style={{ marginRight: 8 }} />
+          Risk Overview
+        </Title3>
+        <div className={styles.riskGrid}>
+          <Card className={`${styles.riskCard} ${styles.highRisk}`}>
+            <Text className={styles.statLabel}>High Risk</Text>
+            <Text className={styles.riskValue} style={{ color: tokens.colorPaletteRedForeground1 }}>
+              {stats?.high_risk ?? 0}
+            </Text>
+          </Card>
+          <Card className={`${styles.riskCard} ${styles.mediumRisk}`}>
+            <Text className={styles.statLabel}>Medium Risk</Text>
+            <Text className={styles.riskValue} style={{ color: tokens.colorPaletteYellowForeground2 }}>
+              {stats?.medium_risk ?? 0}
+            </Text>
+          </Card>
+          <Card className={`${styles.riskCard} ${styles.lowRisk}`}>
+            <Text className={styles.statLabel}>Low Risk</Text>
+            <Text className={styles.riskValue} style={{ color: tokens.colorPaletteGreenForeground1 }}>
+              {stats?.low_risk ?? 0}
+            </Text>
+          </Card>
+          <Card className={styles.riskCard}>
+            <ShieldCheckmarkRegular fontSize={20} />
+            <Text className={styles.statLabel}>No Risks</Text>
+            <Text className={styles.riskValue}>
+              {(stats?.analyzed ?? 0) - (stats?.contracts_with_risks ?? 0)}
+            </Text>
+          </Card>
+        </div>
+        
+        {stats?.most_common_risk && (
+          <div className={styles.commonRisk}>
+            <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
+              Most common risk category:
+            </Text>
+            <Text weight="semibold" style={{ marginLeft: 8 }}>
+              {stats.most_common_risk.replace(/_/g, " ")}
+            </Text>
+            <Badge appearance="outline" style={{ marginLeft: 8 }}>
+              {stats.most_common_risk_count} occurrence{stats.most_common_risk_count !== 1 ? "s" : ""}
+            </Badge>
+          </div>
+        )}
+      </div>
+
+      {/* Recent Contracts */}
+      <Title3>Recent Contracts</Title3>
       {contracts.length === 0 ? (
         <Text style={{ display: "block", marginTop: 12, color: tokens.colorNeutralForeground3 }}>
           No contracts uploaded yet.{" "}
@@ -135,7 +201,7 @@ function Dashboard() {
         </Text>
       ) : (
         <div className={styles.contractList}>
-          {contracts.map((c) => (
+          {contracts.slice(0, 10).map((c) => (
             <div
               key={c.id}
               className={styles.contractRow}

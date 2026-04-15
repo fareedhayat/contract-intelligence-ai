@@ -17,7 +17,8 @@ import {
   MessageBar,
   MessageBarBody,
 } from "@fluentui/react-components";
-import { getContract, getAnalysis, getAnalysisStatus } from "../services/api";
+import { getContract, getAnalysisStatus } from "../services/api";
+import { useData } from "../components/DataProvider";
 import type { ContractDocument, AnalysisResult } from "../types";
 
 const useStyles = makeStyles({
@@ -81,6 +82,7 @@ const severityColor = (s: string) =>
 function ContractDetail() {
   const { id } = useParams<{ id: string }>();
   const styles = useStyles();
+  const { getContractAnalysis, refreshAll } = useData();
   const [contract, setContract] = useState<ContractDocument | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,12 +96,8 @@ function ContractDetail() {
         const c = await getContract(id!);
         setContract(c);
 
-        try {
-          const a = await getAnalysis(id!);
-          setAnalysis(a);
-        } catch {
-          // Analysis may not exist yet
-        }
+        const a = await getContractAnalysis(id!);
+        setAnalysis(a);
       } catch {
         setError("Contract not found");
       } finally {
@@ -107,7 +105,7 @@ function ContractDetail() {
       }
     }
     load();
-  }, [id]);
+  }, [id, getContractAnalysis]);
 
   // Poll if analysis is in progress
   useEffect(() => {
@@ -117,8 +115,11 @@ function ContractDetail() {
       try {
         const status = await getAnalysisStatus(id);
         if (status.status === "completed" || status.status === "failed") {
-          const a = await getAnalysis(id);
+          // Refresh to get latest data
+          const a = await getContractAnalysis(id, true);
           setAnalysis(a);
+          // Also refresh global state
+          await refreshAll();
           clearInterval(interval);
         }
       } catch {
@@ -127,7 +128,7 @@ function ContractDetail() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [id, analysis?.status]);
+  }, [id, analysis?.status, getContractAnalysis, refreshAll]);
 
   if (loading) return <Spinner label="Loading contract..." />;
   if (error) return <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>;

@@ -184,26 +184,108 @@ async def get_dashboard_stats(settings: Settings) -> dict:
     async for item in total_query:
         total_contracts = item
 
-    # Analysis counts by status
-    status_query = analysis_container.query_items(
-        query="SELECT c.status, COUNT(1) as count FROM c GROUP BY c.status",
+    # Fetch all analyses and count statuses in Python (Cosmos DB doesn't support GROUP BY across partitions)
+    all_analyses_query = analysis_container.query_items(
+        query="SELECT c.status, c.risk_flags, c.obligations FROM c",
     )
-    status_counts = {}
-    async for item in status_query:
-        status_counts[item["status"]] = item["count"]
+    
+    status_counts: dict[str, int] = {}
+    high_risk = 0
+    medium_risk = 0
+    low_risk = 0
+    total_obligations = 0
+    risk_category_counts: dict[str, int] = {}
+    
+    async for item in all_analyses_query:
+        # Count by status
+        status = item.get("status", "pending")
+        status_counts[status] = status_counts.get(status, 0) + 1
+        
+        # Only process completed analyses for risk stats
+        if status != "completed":
+            continue
+            
+        risk_flags = item.get("risk_flags", []) or []
+        obligations = item.get("obligations", []) or []
+        total_obligations += len(obligations)
+        
+        has_high = False
+        has_medium = False
+        
+        for rf in risk_flags:
+            severity = rf.get("severity", "low")
+            category = rf.get("category", "unknown")
+            
+            if severity == "high":
+                has_high = True
+            elif severity == "medium":
+                has_medium = True
+            
+            risk_category_counts[category] = risk_category_counts.get(category, 0) + 1
+        
+        if has_high:
+            high_risk += 1
+        elif has_medium:
+            medium_risk += 1
+        elif risk_flags:
+            low_risk += 1
 
-    # High risk count
-    risk_query = analysis_container.query_items(
-        query="SELECT VALUE COUNT(1) FROM c WHERE ARRAY_LENGTH(c.risk_flags) > 0",
-    )
-    contracts_with_risks = 0
-    async for item in risk_query:
-        contracts_with_risks = item
+    # Find most common risk category
+    most_common_risk = None
+    most_common_risk_count = 0
+    for cat, count in risk_category_counts.items():
+        if count > most_common_risk_count:
+            most_common_risk = cat
+            most_common_risk_count = count
 
     return {
         "total_contracts": total_contracts,
         "analyzed": status_counts.get("completed", 0),
         "pending": status_counts.get("pending", 0) + status_counts.get("in_progress", 0),
         "failed": status_counts.get("failed", 0),
-        "contracts_with_risks": contracts_with_risks,
+        "contracts_with_risks": high_risk + medium_risk + low_risk,
+        "high_risk": high_risk,
+        "medium_risk": medium_risk,
+        "low_risk": low_risk,
+        "total_obligations": total_obligations,
+        "most_common_risk": most_common_risk,
+        "most_common_risk_count": most_common_risk_count,
     }
+
+
+async def delete_all_data(settings: Settings) -> dict:
+    """Delete ALL contracts, analyses, and comparisons. Fresh start."""
+    contracts_container = await _get_container(settings, CONTRACTS_CONTAINER)
+    analysis_container = await _get_container(settings, ANALYSIS_CONTAINER)
+    comparisons_container = await _get_container(settings, COMPARISONS_CONTAINER)
+    
+    deleted = {"contracts": 0, "analyses": 0, "comparisons": 0}
+    
+    # Delete all contracts
+    query = contracts_container.query_items(query="SELECT c.id FROM c")
+    async for item in query:
+        try:
+            await contracts_container.delete_item(item=item["id"], partition_key=item["id"])
+            deleted["contracts"] += 1
+        except exceptions.CosmosResourceNotFoundError:
+            pass
+    
+    # Delete all analyses
+    query = analysis_container.query_items(query="SELECT c.id, c.contract_id FROM c")
+    async for item in query:
+        try:
+            await analysis_container.delete_item(item=item["id"], partition_key=item["contract_id"])
+            deleted["analyses"] += 1
+        except exceptions.CosmosResourceNotFoundError:
+            pass
+    
+    # Delete all comparisons
+    query = comparisons_container.query_items(query="SELECT c.id FROM c")
+    async for item in query:
+        try:
+            await comparisons_container.delete_item(item=item["id"], partition_key=item["id"])
+            deleted["comparisons"] += 1
+        except exceptions.CosmosResourceNotFoundError:
+            pass
+    
+    return deleted

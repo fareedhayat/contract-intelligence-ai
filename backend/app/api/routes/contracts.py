@@ -12,6 +12,7 @@ from app.services.database import (
     get_contract,
     list_contracts,
     delete_contract,
+    delete_all_data,
 )
 
 router = APIRouter()
@@ -77,3 +78,11 @@ async def delete_contract_endpoint(contract_id: str):
 
     await delete_contract(contract_id, settings)
     return {"deleted": contract_id}
+
+
+@router.delete("/cleanup/all")
+async def delete_all_data_endpoint():
+    """Delete ALL contracts, analyses, and comparisons. Fresh start."""
+    settings = _get_settings()
+    result = await delete_all_data(settings)
+    return result

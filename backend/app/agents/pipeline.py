@@ -78,6 +78,7 @@ def create_client(settings: Settings) -> OpenAIChatCompletionClient:
 async def run_analysis_pipeline(
     contract_text: str,
     contract_id: str,
+    analysis_id: str,
     settings: Settings,
 ) -> AnalysisResult:
     """Run the 4-agent sequential analysis pipeline on a contract.
@@ -150,7 +151,7 @@ async def run_analysis_pipeline(
     summary = SummaryResponse.model_validate_json(str(summary_result)).summary
 
     return AnalysisResult(
-        id=uuid.uuid4().hex,
+        id=analysis_id,  # Use the same ID created at trigger time
         contract_id=contract_id,
         status=AnalysisStatus.COMPLETED,
         extracted_data=extracted_data,

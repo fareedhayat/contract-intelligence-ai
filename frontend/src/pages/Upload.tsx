@@ -13,6 +13,7 @@ import {
 } from "@fluentui/react-components";
 import { ArrowUploadRegular, DocumentRegular } from "@fluentui/react-icons";
 import { uploadContract, triggerAnalysis } from "../services/api";
+import { useData } from "../components/DataProvider";
 
 const useStyles = makeStyles({
   dropZone: {
@@ -49,6 +50,7 @@ const useStyles = makeStyles({
 function Upload() {
   const styles = useStyles();
   const navigate = useNavigate();
+  const { refreshAll } = useData();
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -81,6 +83,8 @@ function Upload() {
       await triggerAnalysis(result.contract_id);
       setSuccess({ contractId: result.contract_id, filename: result.filename });
       setFile(null);
+      // Refresh all data so other screens update
+      await refreshAll();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Upload failed";
       setError(message);

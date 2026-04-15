@@ -16,6 +16,7 @@ import {
   ArrowRepeatAllRegular,
 } from "@fluentui/react-icons";
 import { getUpcomingObligations, listObligations } from "../services/api";
+import { useData } from "../components/DataProvider";
 import type { ObligationWithContract } from "../types";
 
 const useStyles = makeStyles({
@@ -65,10 +66,12 @@ type TimeRange = "30" | "60" | "90" | "180" | "365" | "all";
 function Obligations() {
   const styles = useStyles();
   const navigate = useNavigate();
+  const { contracts } = useData();
   const [obligations, setObligations] = useState<ObligationWithContract[]>([]);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<TimeRange>("30");
 
+  // Reload obligations when range changes or when contracts list changes (new analysis completed)
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -87,7 +90,7 @@ function Obligations() {
       }
     }
     load();
-  }, [range]);
+  }, [range, contracts]);
 
   return (
     <div>

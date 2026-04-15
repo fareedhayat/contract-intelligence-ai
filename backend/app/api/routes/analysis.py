@@ -25,10 +25,10 @@ def _get_settings() -> Settings:
     return Settings()
 
 
-async def _run_analysis_background(contract_id: str, settings: Settings):
+async def _run_analysis_background(contract_id: str, analysis_id: str, settings: Settings):
     """Background task that runs the full analysis pipeline."""
     try:
-        logger.info(f"Starting analysis for contract {contract_id}")
+        logger.info(f"Starting analysis for contract {contract_id} (analysis_id={analysis_id})")
         await update_analysis_status(contract_id, AnalysisStatus.IN_PROGRESS, settings)
 
         contract = await get_contract(contract_id, settings)
@@ -44,7 +44,7 @@ async def _run_analysis_background(contract_id: str, settings: Settings):
         contract_text = await parse_document(contract.file_path, settings)
         logger.info(f"Document parsed, {len(contract_text)} characters. Running AI pipeline...")
         
-        result = await run_analysis_pipeline(contract_text, contract_id, settings)
+        result = await run_analysis_pipeline(contract_text, contract_id, analysis_id, settings)
         logger.info(f"Analysis complete for {contract_id}: {len(result.risk_flags)} risks, {len(result.obligations)} obligations")
         await save_analysis(result, settings)
 
@@ -75,16 +75,18 @@ async def trigger_analysis(contract_id: str, background_tasks: BackgroundTasks):
     if contract is None:
         raise HTTPException(status_code=404, detail="Contract not found")
 
-    # Create a pending analysis record
+    # Create a pending analysis record with a fixed ID
+    analysis_id = uuid.uuid4().hex
     analysis = AnalysisResult(
-        id=uuid.uuid4().hex,
+        id=analysis_id,
         contract_id=contract_id,
         status=AnalysisStatus.PENDING,
         created_at=datetime.utcnow(),
     )
     await save_analysis(analysis, settings)
 
-    background_tasks.add_task(_run_analysis_background, contract_id, settings)
+    # Pass analysis_id so the pipeline updates the same record
+    background_tasks.add_task(_run_analysis_background, contract_id, analysis_id, settings)
 
     return {"contract_id": contract_id, "status": "pending"}
 

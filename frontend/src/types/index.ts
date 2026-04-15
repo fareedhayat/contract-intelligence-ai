@@ -110,6 +110,12 @@ export interface DashboardStats {
   pending: number;
   failed: number;
   contracts_with_risks: number;
+  high_risk: number;
+  medium_risk: number;
+  low_risk: number;
+  total_obligations: number;
+  most_common_risk: string | null;
+  most_common_risk_count: number;
 }
 
 export interface ObligationWithContract extends Obligation {
