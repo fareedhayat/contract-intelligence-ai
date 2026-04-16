@@ -13,6 +13,10 @@ def _txt_dir(data_path: str) -> Path:
     return Path(data_path) / "full_contract_txt"
 
 
+def _pdf_dir(data_path: str) -> Path:
+    return Path(data_path) / "full_contract_pdf"
+
+
 def load_master_csv(data_path: str) -> pd.DataFrame:
     """Load the CUAD master clauses CSV into a DataFrame."""
     csv_path = _master_csv_path(data_path)
@@ -31,6 +35,34 @@ def list_contracts(data_path: str) -> list[str]:
             f"Contract text directory not found at {txt_dir}. Download the CUAD dataset first."
         )
     return sorted(f.name for f in txt_dir.iterdir() if f.suffix == ".txt")
+
+
+def list_pdf_contracts(data_path: str) -> list[str]:
+    """Return filenames of all .pdf contracts in the CUAD dataset."""
+    pdf_dir = _pdf_dir(data_path)
+    if not pdf_dir.exists():
+        raise FileNotFoundError(
+            f"Contract PDF directory not found at {pdf_dir}. Download the CUAD dataset first."
+        )
+    return sorted(f.name for f in pdf_dir.iterdir() if f.suffix.lower() == ".pdf")
+
+
+def get_contract_pdf_path(filename: str, data_path: str) -> str:
+    """Return the full path to a CUAD PDF contract.
+
+    Accepts either a .pdf or .txt filename — always resolves to the PDF.
+    """
+    stem = Path(filename).stem
+    pdf_path = _pdf_dir(data_path) / f"{stem}.pdf"
+    if not pdf_path.exists():
+        raise FileNotFoundError(f"Contract PDF not found: {pdf_path}")
+    return str(pdf_path)
+
+
+def filter_pdf_by_type(contract_type: str, data_path: str) -> list[str]:
+    """Return PDF filenames of contracts matching a given contract type."""
+    txt_filenames = filter_by_type(contract_type, data_path)
+    return [Path(f).stem + ".pdf" for f in txt_filenames]
 
 
 def get_contract_text(filename: str, data_path: str) -> str:

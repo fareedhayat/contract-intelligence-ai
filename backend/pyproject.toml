@@ -10,7 +10,8 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
-    "agent-framework",
+    "agent-framework-core",
+    "agent-framework-openai",
     "azure-cosmos>=4.7.0",
     "azure-ai-documentintelligence>=1.0.0",
     "azure-storage-blob>=12.20.0",

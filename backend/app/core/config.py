@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # Local development fallbacks
     use_local_storage: bool = True
-    use_local_parser: bool = True
+    use_local_parser: bool = False
 
     # CUAD dataset path (relative to backend/)
     cuad_data_path: str = "data"

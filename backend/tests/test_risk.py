@@ -109,7 +109,7 @@ async def test_risk_detection_accuracy(cuad_sample, settings):
         text = get_contract_text(filename, settings.cuad_data_path)
         gt = get_ground_truth(filename, settings.cuad_data_path)
 
-        result = await run_analysis_pipeline(text, f"test-risk-{filename}", settings)
+        result = await run_analysis_pipeline(text, f"test-risk-{filename}", f"analysis-risk-{filename}", settings)
 
         # Categories flagged by our system
         flagged_categories = set(rf.category.value for rf in result.risk_flags)

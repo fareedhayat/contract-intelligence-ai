@@ -3,28 +3,6 @@ from typing import Annotated
 from agent_framework import tool
 from pydantic import Field
 
-from app.core.config import Settings
-from app.services.cuad_loader import get_ground_truth
-
-
-@tool
-def lookup_cuad_ground_truth(
-    filename: Annotated[str, Field(description="CUAD contract filename (e.g., 'ContractName.txt')")],
-    clause_type: Annotated[str, Field(description="Clause category name from CUAD's 41 categories")],
-) -> str:
-    """Look up CUAD expert annotations for a specific contract and clause type.
-    Returns the ground truth answer spans, or 'No annotation found' if empty."""
-    settings = Settings()
-    try:
-        ground_truth = get_ground_truth(filename, settings.cuad_data_path)
-    except (FileNotFoundError, ValueError) as e:
-        return f"Error: {e}"
-
-    annotations = ground_truth.get(clause_type, [])
-    if not annotations:
-        return "No annotation found for this clause type."
-    return "; ".join(annotations)
-
 
 @tool
 def check_risk_rules(
@@ -80,32 +58,3 @@ def check_risk_rules(
     if not risks:
         return "No specific risk patterns detected for this clause."
     return "\n".join(risks)
-
-
-@tool
-def parse_contract_dates(
-    text: Annotated[str, Field(description="Text containing dates to extract and normalize")],
-) -> str:
-    """Extract and normalize dates found in contract text.
-    Returns a list of identified dates with context."""
-    import re
-
-    date_patterns = [
-        (r'\b(\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4})\b', "numeric date"),
-        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b', "full date"),
-        (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d{1,2},?\s+\d{4}\b', "abbreviated date"),
-        (r'\b\d{4}[/\-]\d{1,2}[/\-]\d{1,2}\b', "ISO date"),
-    ]
-
-    found_dates = []
-    for pattern, label in date_patterns:
-        matches = re.finditer(pattern, text, re.IGNORECASE)
-        for match in matches:
-            start = max(0, match.start() - 50)
-            end = min(len(text), match.end() + 50)
-            context = text[start:end].replace("\n", " ").strip()
-            found_dates.append(f"{match.group()} ({label}) — ...{context}...")
-
-    if not found_dates:
-        return "No dates found in the provided text."
-    return "\n".join(found_dates)

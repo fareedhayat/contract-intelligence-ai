@@ -132,11 +132,11 @@ Contract (PDF / Word / TXT)
 Azure AI Document Intelligence  ← parse text + tables
         │
         ▼
-Agent Framework WorkflowBuilder Pipeline
-  DataExtractorAgent  → parties, dates, financial terms
-  RiskAnalysisAgent   → flagged clauses with severity
-  ObligationAgent     → deadlines, renewals, notice periods
-  SummaryAgent        → plain-English brief
+Agent Framework Sequential Pipeline
+  DataExtractor   → parties, dates, financial terms
+  RiskAnalyst     → flagged clauses with severity
+  ObligationTracker → deadlines, renewals, notice periods
+  Summarizer      → plain-English brief
         │
         ▼
 Azure Cosmos DB  ← store structured JSON results
@@ -151,17 +151,18 @@ React + Fluent UI  ← interactive dashboard
 ### Agent Pipeline (Microsoft Agent Framework)
 
 ```python
-workflow = (
-    WorkflowBuilder()
-    .set_start_executor(extractor)
-    .add_edge(extractor, risk_analyst)
-    .add_edge(risk_analyst, obligation_tracker)
-    .add_edge(obligation_tracker, summarizer)
-    .build()
+client = OpenAIChatCompletionClient(
+    model="gpt-4o",
+    azure_endpoint=settings.azure_openai_endpoint,
+    api_key=settings.azure_openai_api_key,
 )
+extractor = Agent(client=client, name="DataExtractor", instructions=EXTRACTOR_PROMPT, tools=[parse_contract_dates])
+
+result = await extractor.run(contract_text, options={"response_format": ExtractorResponse})
+extracted_data = result.value.extracted_data
 ```
 
-Each agent receives structured output from the previous agent and uses `response_format` (Pydantic model) for typed output — no string parsing.
+Each agent receives structured output from the previous agent and uses `response_format` (Pydantic model) for typed output via `result.value` — no manual JSON parsing.
 
 ---
 

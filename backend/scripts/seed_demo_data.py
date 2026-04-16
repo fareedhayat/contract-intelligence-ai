@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Seed the database with 50 CUAD contracts (2 per type) and run analysis on each."""
+"""Seed the database with 50 CUAD contracts (2 per type) and run analysis on each.
+
+Uses Azure AI Document Intelligence to parse PDFs, then the AI agent pipeline for analysis.
+"""
 
 import asyncio
 import sys
@@ -11,7 +14,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.core.config import Settings
 from app.core.models import AnalysisResult, AnalysisStatus, ContractDocument
-from app.services.cuad_loader import filter_by_type, get_contract_text, get_contract_types
+from app.services.cuad_loader import (
+    filter_pdf_by_type,
+    get_contract_pdf_path,
+    get_contract_types,
+)
+from app.services.document_parser import parse_document
 from app.services.database import ensure_database, get_contract, save_analysis, save_contract
 from app.agents.pipeline import run_analysis_pipeline
 
@@ -29,7 +37,7 @@ async def seed() -> None:
     failed = 0
 
     for contract_type in contract_types:
-        filenames = filter_by_type(contract_type, settings.cuad_data_path)[:CONTRACTS_PER_TYPE]
+        filenames = filter_pdf_by_type(contract_type, settings.cuad_data_path)[:CONTRACTS_PER_TYPE]
         for filename in filenames:
             contract_id = uuid.uuid5(uuid.NAMESPACE_DNS, filename).hex
 
@@ -38,11 +46,13 @@ async def seed() -> None:
                 print(f"  [skip] {filename}")
                 continue
 
+            pdf_path = get_contract_pdf_path(filename, settings.cuad_data_path)
+
             contract = ContractDocument(
                 id=contract_id,
                 filename=filename,
                 upload_date=datetime.utcnow(),
-                file_path=str(Path(settings.cuad_data_path) / "full_contract_txt" / filename),
+                file_path=pdf_path,
                 contract_type=contract_type,
                 status=AnalysisStatus.IN_PROGRESS,
             )
@@ -58,10 +68,8 @@ async def seed() -> None:
 
             print(f"  Analyzing {filename} ({contract_type}) ...", end=" ", flush=True)
             try:
-                contract_text = get_contract_text(filename, settings.cuad_data_path)
-                analysis = await run_analysis_pipeline(contract_text, settings)
-                analysis.id = analysis_id
-                analysis.contract_id = contract_id
+                contract_text = await parse_document(pdf_path, settings)
+                analysis = await run_analysis_pipeline(contract_text, contract_id, analysis_id, settings)
                 analysis.status = AnalysisStatus.COMPLETED
                 analysis.completed_at = datetime.utcnow()
                 await save_analysis(analysis, settings)

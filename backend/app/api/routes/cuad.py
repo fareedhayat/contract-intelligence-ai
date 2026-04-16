@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -21,15 +22,15 @@ async def list_cuad_contracts(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=500),
 ):
-    """List available CUAD dataset contracts, optionally filtered by type."""
+    """List available CUAD dataset PDF contracts, optionally filtered by type."""
     settings = _get_settings()
     data_path = settings.cuad_data_path
 
     try:
         if contract_type:
-            filenames = cuad_loader.filter_by_type(contract_type, data_path)
+            filenames = cuad_loader.filter_pdf_by_type(contract_type, data_path)
         else:
-            filenames = cuad_loader.list_contracts(data_path)
+            filenames = cuad_loader.list_pdf_contracts(data_path)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -53,25 +54,28 @@ async def list_cuad_contract_types():
 
 @router.post("/import/{filename}")
 async def import_cuad_contract(filename: str):
-    """Import a single CUAD contract into the system."""
+    """Import a single CUAD PDF contract into the system."""
     settings = _get_settings()
 
     try:
-        text = cuad_loader.get_contract_text(filename, settings.cuad_data_path)
+        pdf_path = cuad_loader.get_contract_pdf_path(filename, settings.cuad_data_path)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
+    pdf_filename = Path(pdf_path).name
+    file_size = Path(pdf_path).stat().st_size
+
     contract = ContractDocument(
         id=uuid.uuid4().hex,
-        filename=filename,
+        filename=pdf_filename,
         upload_date=datetime.utcnow(),
-        file_path=f"{settings.cuad_data_path}/full_contract_txt/{filename}",
+        file_path=pdf_path,
         status=AnalysisStatus.PENDING,
     )
 
     await save_contract(contract, settings)
 
-    return {"contract_id": contract.id, "filename": filename, "characters": len(text)}
+    return {"contract_id": contract.id, "filename": pdf_filename, "file_size_bytes": file_size}
 
 
 @router.post("/import-batch")
@@ -79,15 +83,15 @@ async def import_cuad_batch(
     contract_type: str | None = Query(None),
     limit: int = Query(10, ge=1, le=50),
 ):
-    """Import a batch of CUAD contracts by type."""
+    """Import a batch of CUAD PDF contracts by type."""
     settings = _get_settings()
     data_path = settings.cuad_data_path
 
     try:
         if contract_type:
-            filenames = cuad_loader.filter_by_type(contract_type, data_path)
+            filenames = cuad_loader.filter_pdf_by_type(contract_type, data_path)
         else:
-            filenames = cuad_loader.list_contracts(data_path)
+            filenames = cuad_loader.list_pdf_contracts(data_path)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -95,15 +99,16 @@ async def import_cuad_batch(
     imported = []
 
     for filename in filenames:
-        text = cuad_loader.get_contract_text(filename, data_path)
+        pdf_path = cuad_loader.get_contract_pdf_path(filename, data_path)
+        pdf_filename = Path(pdf_path).name
         contract = ContractDocument(
             id=uuid.uuid4().hex,
-            filename=filename,
+            filename=pdf_filename,
             upload_date=datetime.utcnow(),
-            file_path=f"{data_path}/full_contract_txt/{filename}",
+            file_path=pdf_path,
             status=AnalysisStatus.PENDING,
         )
         await save_contract(contract, settings)
-        imported.append({"contract_id": contract.id, "filename": filename, "characters": len(text)})
+        imported.append({"contract_id": contract.id, "filename": pdf_filename})
 
     return {"imported": len(imported), "contracts": imported}

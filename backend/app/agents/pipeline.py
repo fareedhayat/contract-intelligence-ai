@@ -92,53 +92,49 @@ async def run_analysis_pipeline(
     extractor = Agent(
         client=client,
         name="DataExtractor",
-        instructions=EXTRACTOR_PROMPT + "\n\nRespond with valid JSON matching this schema: " + ExtractorResponse.model_json_schema().__str__(),
+        instructions=EXTRACTOR_PROMPT,
         tools=[parse_contract_dates],
     )
 
     risk_analyst = Agent(
         client=client,
         name="RiskAnalyst",
-        instructions=RISK_PROMPT + "\n\nRespond with valid JSON matching this schema: " + RiskResponse.model_json_schema().__str__(),
+        instructions=RISK_PROMPT,
         tools=[check_risk_rules],
     )
 
     obligation_tracker = Agent(
         client=client,
         name="ObligationTracker",
-        instructions=OBLIGATION_PROMPT + "\n\nRespond with valid JSON matching this schema: " + ObligationResponse.model_json_schema().__str__(),
+        instructions=OBLIGATION_PROMPT,
         tools=[parse_contract_dates],
     )
 
     summarizer = Agent(
         client=client,
         name="Summarizer",
-        instructions=SUMMARY_PROMPT + "\n\nRespond with valid JSON matching this schema: " + SummaryResponse.model_json_schema().__str__(),
+        instructions=SUMMARY_PROMPT,
     )
 
     # Run each agent individually so we can collect structured output from each
-    extractor_result = await extractor.run(contract_text)
-    extracted_data = ExtractorResponse.model_validate_json(
-        str(extractor_result)
-    ).extracted_data
+    extractor_result = await extractor.run(contract_text, options={"response_format": ExtractorResponse})
+    extracted_data = extractor_result.value.extracted_data
 
     # Feed contract text + extraction results to risk analyst
     risk_input = (
         f"{contract_text}\n\n---\nExtracted data from prior analysis:\n"
         f"{extracted_data.model_dump_json()}"
     )
-    risk_result = await risk_analyst.run(risk_input)
-    risk_flags = RiskResponse.model_validate_json(str(risk_result)).risk_flags
+    risk_result = await risk_analyst.run(risk_input, options={"response_format": RiskResponse})
+    risk_flags = risk_result.value.risk_flags
 
     # Feed contract text + prior results to obligation tracker
     obligation_input = (
         f"{contract_text}\n\n---\nExtracted data:\n"
         f"{extracted_data.model_dump_json()}"
     )
-    obligation_result = await obligation_tracker.run(obligation_input)
-    obligations = ObligationResponse.model_validate_json(
-        str(obligation_result)
-    ).obligations
+    obligation_result = await obligation_tracker.run(obligation_input, options={"response_format": ObligationResponse})
+    obligations = obligation_result.value.obligations
 
     # Feed contract text + all prior results to summarizer
     summary_input = (
@@ -147,8 +143,8 @@ async def run_analysis_pipeline(
         f"Risk flags:\n{RiskResponse(risk_flags=risk_flags).model_dump_json()}\n\n"
         f"Obligations:\n{ObligationResponse(obligations=obligations).model_dump_json()}"
     )
-    summary_result = await summarizer.run(summary_input)
-    summary = SummaryResponse.model_validate_json(str(summary_result)).summary
+    summary_result = await summarizer.run(summary_input, options={"response_format": SummaryResponse})
+    summary = summary_result.value.summary
 
     return AnalysisResult(
         id=analysis_id,  # Use the same ID created at trigger time
@@ -176,7 +172,7 @@ async def run_comparison(
     comparator = Agent(
         client=client,
         name="Comparator",
-        instructions=COMPARISON_PROMPT + "\n\nRespond with valid JSON matching this schema: " + ComparisonResponse.model_json_schema().__str__(),
+        instructions=COMPARISON_PROMPT,
     )
 
     comparison_input = (
@@ -186,8 +182,8 @@ async def run_comparison(
         f"{analysis_b.model_dump_json()}"
     )
 
-    result = await comparator.run(comparison_input)
-    parsed = ComparisonResponse.model_validate_json(str(result))
+    result = await comparator.run(comparison_input, options={"response_format": ComparisonResponse})
+    parsed = result.value
 
     return ComparisonResult(
         id=uuid.uuid4().hex,

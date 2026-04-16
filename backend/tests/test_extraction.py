@@ -109,7 +109,7 @@ async def test_extraction_accuracy(cuad_sample, settings):
         gt = get_ground_truth(filename, settings.cuad_data_path)
 
         # Run the pipeline
-        result = await run_analysis_pipeline(text, f"test-{filename}", settings)
+        result = await run_analysis_pipeline(text, f"test-{filename}", f"analysis-test-{filename}", settings)
         ed = result.extracted_data
 
         if ed is None:
@@ -167,7 +167,7 @@ async def test_date_extraction_accuracy(cuad_sample, settings):
         text = get_contract_text(filename, settings.cuad_data_path)
         gt = get_ground_truth(filename, settings.cuad_data_path)
 
-        result = await run_analysis_pipeline(text, f"test-date-{filename}", settings)
+        result = await run_analysis_pipeline(text, f"test-date-{filename}", f"analysis-date-{filename}", settings)
         ed = result.extracted_data
 
         if ed is None:
