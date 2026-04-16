@@ -15,7 +15,7 @@ from app.services.database import (
     update_analysis_status,
     get_dashboard_stats,
 )
-from app.agents.pipeline import run_analysis_pipeline
+from app.agents.orchestrator import run_analysis_pipeline
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

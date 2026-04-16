@@ -21,7 +21,7 @@ from app.services.cuad_loader import (
 )
 from app.services.document_parser import parse_document
 from app.services.database import ensure_database, get_contract, save_analysis, save_contract
-from app.agents.pipeline import run_analysis_pipeline
+from app.agents.orchestrator import run_analysis_pipeline
 
 CONTRACTS_PER_TYPE = 2
 

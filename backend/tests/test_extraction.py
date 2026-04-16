@@ -18,7 +18,7 @@ from app.services.cuad_loader import (
     get_contract_text,
     get_ground_truth,
 )
-from app.agents.pipeline import run_analysis_pipeline
+from app.agents.orchestrator import run_analysis_pipeline
 
 
 # Number of contracts to test (subset for speed)

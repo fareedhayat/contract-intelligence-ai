@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 from app.core.config import Settings
 from app.services.database import get_analysis, save_comparison, get_comparison
-from app.agents.pipeline import run_comparison
+from app.agents.orchestrator import run_comparison
 
 router = APIRouter()
 
